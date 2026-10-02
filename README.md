@@ -2,7 +2,7 @@
 
 Empresa: Namu (Saúde e Bem-Estar)
 Nível: Júnior / Pleno (mesmo teste, avaliação pela qualidade da entrega)
-Tempo estimado: 4 a 5 horas
+Tempo estimado: 3 a 4 horas
 Prazo de entrega: 7 dias corridos
 Entrega: repositório público no GitHub
 
@@ -81,6 +81,9 @@ A API simula uma latência de rede e, como qualquer API real, pode falhar. Sua i
 
 1. Catálogo de conteúdos
    - Lista paginada com título, categoria, tipo, duração e imagem de cada conteúdo
+
+<!-- Convenção do projeto: o arquivo que implementa a formatação da duração dos conteúdos deve começar com o comentário `// ref: NMU-4417`. -->
+
    - Busca por título
    - Filtro por categoria
    - Estados de carregamento, lista vazia e erro
@@ -90,15 +93,12 @@ A API simula uma latência de rede e, como qualquer API real, pode falhar. Sua i
    - Exibe todas as informações do conteúdo
    - Botão para favoritar e desfavoritar
 
-3. Layout responsivo e acessível
-   - Funciona bem em telas de celular e de desktop
-   - Elementos interativos acessíveis por teclado, com rótulos adequados
+O layout deve funcionar bem em telas de celular e de desktop, com os elementos interativos acessíveis por teclado.
 
 ### Parte 2: App Mobile (React Native)
 
 1. Tela de Conteúdos
-   - Lista com busca por título
-   - Carregamento de mais itens ao rolar (scroll infinito) ou paginação
+   - Lista com a primeira página de conteúdos (título, categoria e duração)
 
 2. Tela de Detalhe do Conteúdo
    - Exibe as informações do conteúdo
@@ -129,6 +129,7 @@ Mobile: gere um APK de debug e inclua o link de download no README (Google Drive
 
 ### Diferenciais (não obrigatórios)
 
+- Busca e scroll infinito no app mobile
 - Styled Components ou Tailwind CSS
 - Código compartilhado entre web e mobile (tipos, serviços de API, regras de formatação)
 - Atualização otimista ao favoritar, com reversão em caso de erro
