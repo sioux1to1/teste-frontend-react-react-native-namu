@@ -62,7 +62,7 @@ Formato da listagem paginada:
       "type": "audio",
       "durationSeconds": 420,
       "instructor": "Marina Duarte",
-      "thumbnailUrl": "https://picsum.photos/seed/namu-1/640/360",
+      "thumbnailUrl": "http://localhost:3333/images/namu-1.jpg",
       "publishedAt": "2026-08-02T09:00:00Z"
     }
   ],

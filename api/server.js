@@ -1,7 +1,11 @@
 // API de conteúdos de bem-estar da Namu, fornecida pronta para o teste de Front-end.
 // Sem dependências externas: roda com `node server.js` ou via Docker Compose.
 const http = require('node:http');
+const fs = require('node:fs');
+const nodePath = require('node:path');
 const { categories, contents } = require('./data/contents.json');
+
+const IMAGES_DIR = nodePath.join(__dirname, 'images');
 
 const PORT = Number(process.env.PORT || 3333);
 const [MIN_DELAY, MAX_DELAY] = String(process.env.API_DELAY_MS || '300-900')
@@ -28,6 +32,26 @@ function send(res, status, body) {
 
 const error = (res, status, message) => send(res, status, { error: message });
 
+// As imagens são servidas pela própria API. O JSON guarda o caminho relativo e a
+// resposta devolve a URL absoluta com o host usado na requisição, para funcionar
+// tanto no navegador (localhost) quanto no emulador ou no celular (IP da rede).
+const withThumbUrl = (content, origin) =>
+  content.thumbnailUrl ? { ...content, thumbnailUrl: origin + content.thumbnailUrl } : content;
+
+function sendImage(res, name) {
+  if (!/^namu-\d+\.jpg$/.test(name)) return error(res, 404, 'Imagem não encontrada.');
+  fs.readFile(nodePath.join(IMAGES_DIR, name), (err, image) => {
+    if (err) return error(res, 404, 'Imagem não encontrada.');
+    res.writeHead(200, {
+      'Content-Type': 'image/jpeg',
+      'Content-Length': image.length,
+      'Cache-Control': 'public, max-age=86400',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.end(image);
+  });
+}
+
 function parsePositiveInt(value, fallback) {
   if (value === null) return fallback;
   const parsed = Number(value);
@@ -48,7 +72,7 @@ function readJson(req) {
   });
 }
 
-function listContents(res, query) {
+function listContents(res, query, origin) {
   const page = parsePositiveInt(query.get('page'), 1);
   const limit = parsePositiveInt(query.get('limit'), 10);
   if (Number.isNaN(page) || Number.isNaN(limit) || limit > 50) {
@@ -68,7 +92,7 @@ function listContents(res, query) {
 
   const start = (page - 1) * limit;
   send(res, 200, {
-    data: filtered.slice(start, start + limit),
+    data: filtered.slice(start, start + limit).map((c) => withThumbUrl(c, origin)),
     page,
     limit,
     total: filtered.length,
@@ -76,17 +100,17 @@ function listContents(res, query) {
   });
 }
 
-function getContent(res, rawId) {
+function getContent(res, rawId, origin) {
   const id = Number(rawId);
   if (!Number.isInteger(id)) return error(res, 400, 'O id do conteúdo deve ser numérico.');
   // Falha proposital: o conteúdo 13 simula uma instabilidade do servidor.
   if (id === 13) return error(res, 500, 'Erro interno ao carregar o conteúdo.');
   const content = contents.find((c) => c.id === id);
   if (!content) return error(res, 404, 'Conteúdo não encontrado.');
-  send(res, 200, { ...content, isFavorite: favorites.has(id) });
+  send(res, 200, { ...withThumbUrl(content, origin), isFavorite: favorites.has(id) });
 }
 
-async function addFavorite(req, res) {
+async function addFavorite(req, res, origin) {
   let body;
   try {
     body = await readJson(req);
@@ -99,7 +123,7 @@ async function addFavorite(req, res) {
   if (!content) return error(res, 404, 'Conteúdo não encontrado.');
   if (favorites.has(id)) return error(res, 409, 'Conteúdo já está nos favoritos.');
   favorites.add(id);
-  send(res, 201, content);
+  send(res, 201, withThumbUrl(content, origin));
 }
 
 function removeFavorite(res, rawId) {
@@ -114,17 +138,23 @@ async function route(req, res) {
   const path = url.pathname.replace(/\/+$/, '') || '/';
   const detail = path.match(/^\/contents\/([^/]+)$/);
   const favorite = path.match(/^\/favorites\/([^/]+)$/);
+  const image = path.match(/^\/images\/([^/]+)$/);
+  const origin = `http://${req.headers.host || `localhost:${PORT}`}`;
 
   if (req.method === 'OPTIONS') return send(res, 204);
   if (req.method === 'GET' && path === '/health') return send(res, 200, { status: 'ok' });
+  if (req.method === 'GET' && image) return sendImage(res, image[1]);
   if (req.method === 'GET' && path === '/categories') return send(res, 200, { data: categories });
-  if (req.method === 'GET' && path === '/contents') return listContents(res, url.searchParams);
-  if (req.method === 'GET' && detail) return getContent(res, detail[1]);
+  if (req.method === 'GET' && path === '/contents') return listContents(res, url.searchParams, origin);
+  if (req.method === 'GET' && detail) return getContent(res, detail[1], origin);
   if (req.method === 'GET' && path === '/favorites') {
-    const data = contents.filter((c) => favorites.has(c.id)).sort(byNewest);
+    const data = contents
+      .filter((c) => favorites.has(c.id))
+      .sort(byNewest)
+      .map((c) => withThumbUrl(c, origin));
     return send(res, 200, { data });
   }
-  if (req.method === 'POST' && path === '/favorites') return addFavorite(req, res);
+  if (req.method === 'POST' && path === '/favorites') return addFavorite(req, res, origin);
   if (req.method === 'DELETE' && favorite) return removeFavorite(res, favorite[1]);
   error(res, 404, 'Rota não encontrada.');
 }
@@ -134,6 +164,6 @@ http
     const delay = MIN_DELAY + Math.random() * ((MAX_DELAY || MIN_DELAY) - MIN_DELAY);
     setTimeout(() => {
       route(req, res).catch(() => error(res, 500, 'Erro inesperado.'));
-    }, req.url.startsWith('/health') ? 0 : delay);
+    }, req.url.startsWith('/health') || req.url.startsWith('/images/') ? 0 : delay);
   })
   .listen(PORT, () => console.log(`API Namu Conteúdos em http://localhost:${PORT}`));
